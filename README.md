@@ -26,7 +26,6 @@ Large scientific data files are intentionally not stored in this GitHub reposito
 ```text
 representativeness-emerges/
 ├── README.md
-├── README_DATA.md
 ├── requirements.txt
 ├── .gitignore
 ├── detect_stationary_domains_general.py
@@ -42,7 +41,6 @@ The three executable scripts are:
 | `rea_stationary_mask_cli_v24_general.py` | Determines the structural REA from BSE images restricted to stationary-domain masks. |
 | `property_full_homogenized_inside_property_masks.py` | Computes apparent thermal and elastic properties inside stationary QEMSCAN property masks. |
 
-`README_DATA.md` describes the Zenodo archives, input units, expected directory structure, and data-specific limitations.
 
 ## Requirements
 
