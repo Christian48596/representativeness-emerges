@@ -19,6 +19,10 @@ def _encode(value):
 
 
 def _decode(value):
+    if set(value)=={'__nonfinite_float__'}:
+        token=value['__nonfinite_float__']
+        if token not in {'nan','inf','-inf'}:raise ValueError('Invalid nonfinite float token')
+        return float(token)
     if '__ndarray__' in value and set(value) == {'__ndarray__', 'dtype', 'shape'}:
         return np.asarray(value['__ndarray__'], dtype=value['dtype']).reshape(value['shape'])
     return {int(k) if k.isdecimal() else k: v for k, v in value.items()}
@@ -27,7 +31,18 @@ def _decode(value):
 def save_checkpoint(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = json.dumps(value, default=_encode, separators=(',', ':'), allow_nan=False).encode('utf-8')
+    # Undefined ancillary diagnostics (e.g. constant-field boundary residuals)
+    # are preserved without emitting invalid JSON NaN/Infinity literals.
+    def prepare(obj):
+        if isinstance(obj,np.ndarray):
+            return {'__ndarray__':prepare(obj.tolist()),'dtype':obj.dtype.str,'shape':list(obj.shape)}
+        if isinstance(obj,np.generic):return prepare(obj.item())
+        if isinstance(obj,float) and not math.isfinite(obj):
+            return {'__nonfinite_float__':str(obj)}
+        if isinstance(obj,dict):return {k:prepare(v) for k,v in obj.items()}
+        if isinstance(obj,(list,tuple)):return [prepare(v) for v in obj]
+        return obj
+    data = json.dumps(prepare(value), separators=(',', ':'), allow_nan=False).encode('utf-8')
     path.write_bytes(gzip.compress(data, mtime=0))
 
 

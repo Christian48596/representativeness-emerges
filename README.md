@@ -6,17 +6,20 @@ This repository provides a Python workflow for determining the spatial support o
 
 The accompanying study applies this framework to two-dimensional polished sections of dune sand. Backscattered-electron (BSE) images provide the structural information. Numerical property maps derived from QEMSCAN mineralogical classifications provide independent conductivity and elasticity fields. The repository contains the analysis programs, reference statistics, uncertainty and sensitivity calculations, and scripts for producing the manuscript figures.
 
+The workflow accepts **N two-dimensional images**, including 9, 20 or more, without editing Python source. Input lists determine N. The uncertainty, sensitivity and plotting programs use the supplied dataset and its parameters. The bundled seven-image dune-sand results remain available as a reproducibility reference.
+
 ## Contents
 
 - [Scientific workflow](#scientific-workflow)
 - [Repository organization](#repository-organization)
-- [Installation and a first verification](#installation-and-a-first-verification)
-- [Download and prepare the data](#download-and-prepare-the-data)
-- [Run the complete analysis](#run-the-complete-analysis)
-- [Quantify uncertainty and parameter sensitivity](#quantify-uncertainty-and-parameter-sensitivity)
-- [Generate the figures](#generate-the-figures)
+- [Installation and verification](#installation-and-verification)
+- [Reproduce the dune-sand study](#reproduce-the-dune-sand-study)
+- [Analyse N new images](#analyse-n-new-images)
+- [Uncertainty and sensitivity for N images](#uncertainty-and-sensitivity-for-n-images)
+- [Independent property calculations](#independent-property-calculations)
+- [Generate figures for your dataset](#generate-figures-for-your-dataset)
 - [Read and interpret the results](#read-and-interpret-the-results)
-- [Apply the programs to another dataset](#apply-the-programs-to-another-dataset)
+- [Troubleshooting](#troubleshooting)
 - [Reproducibility, citation and license](#reproducibility-citation-and-license)
 
 ## Scientific workflow
@@ -45,316 +48,334 @@ The implemented calculations operate on **two-dimensional fields**. The represen
 | [`figures/`](figures/) | Scripts for Figures 1–3 and the supplementary property-map illustration. |
 | [`derived_data/`](derived_data/) | Compact numerical plotting inputs, phase fractions and property summaries. |
 | [`docs/ORIGINAL_RUN_COMMANDS.md`](docs/ORIGINAL_RUN_COMMANDS.md) | Additional documentation of the study's computational settings. |
+| [`tests/test_n_images.py`](tests/test_n_images.py) | Synthetic 9- and 20-image integration checks and input/error cases. |
 | [`requirements.txt`](requirements.txt) | Required Python packages. |
 | [`requirements-revision.txt`](requirements-revision.txt) | Pinned package versions used to verify the numerical reconstruction. |
 
 Large images, full-resolution masks and numerical property maps are distributed through Zenodo. Generated outputs are written under `outputs/` by the commands below.
 
-## Installation and a first verification
+## Installation and verification
 
-The workflow uses NumPy, SciPy, Matplotlib and Pillow. The recorded verification environment uses Python 3.12.14. The shell examples below are written for **Bash on Linux or macOS**; use a Bash terminal when copying blocks containing arrays.
-
-Clone the repository and create a virtual environment:
+The programs require Python, NumPy, SciPy, Matplotlib and Pillow. The recorded verification environment uses Python 3.12.14. Commands below use **Bash on Linux or macOS**; on Windows, use WSL or adapt the shell syntax. Run commands from the repository root with the virtual environment active.
 
 ```bash
 git clone https://github.com/Christian48596/representativeness-emerges.git
 cd representativeness-emerges
-
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-To use the recorded package versions instead, install them in a Python 3.12 environment:
+For the recorded package versions, use `python -m pip install -r requirements-revision.txt` in a Python 3.12 environment.
 
-```bash
-python -m pip install -r requirements-revision.txt
-```
-
-A first numerical verification requires only the files in this repository:
+Check the bundled scientific reference and the N-image interfaces:
 
 ```bash
 python validation/check_reference_results.py
+python -m unittest discover -s tests -p 'test_n_images.py' -v
 ```
 
-This command reconstructs the baseline, all 10,000 bootstrap draws, the leave-one-image-out results, the sampling and screening sensitivity analyses, and the numerical inputs for Figure 2. It compares them with the bundled reference results and checks the three core program files against their recorded Git blob identifiers. A successful run prints `PASS`, followed by the baseline support and bootstrap summary.
+The reference check reconstructs the stored baseline, all 10,000 bootstrap draws, leave-one-image-out results, sensitivity results and Figure 2 arrays. It compares scientific values with the bundled references and independently verifies the three original computational scripts. It needs no downloaded images. The tests exercise distinct synthetic datasets with 9 and 20 images, matched property maps, thermal and plane-strain elastic solutions, custom figures, incomplete inputs and non-selection cases. Synthetic tests verify software behavior; the physical validation remains the dune-sand study.
 
-This compact check uses previously calculated per-image statistics. It verifies the numerical reconstruction without repeating full-resolution image processing or finite-element solves. The next sections explain how to perform those calculations from the raw data.
-
-For the command-line interfaces:
+Every program accepts `--help`. For example:
 
 ```bash
-python detect_stationary_domains_general.py --help
 python rea_stationary_mask_cli_v24_general.py --help
-python property_full_homogenized_inside_property_masks.py --help
+python validation/rea_validation_wrapper.py --help
+python figures/regenerate_revised_figures.py --help
 ```
 
-Full-resolution processing is memory intensive: each BSE field contains approximately 205 million pixels, and intermediate arrays and sampled windows require additional memory. The compact verification is the appropriate starting point on machines with limited memory.
+N is not fixed by the software, but image size, memory and FEM cost limit practical runs. The original structural program holds the image ensemble in memory; validation wrappers process one image at a time. Each original full-resolution BSE field contains approximately 205 million pixels, so start with the compact verification on a memory-limited machine.
 
-## Download and prepare the data
+## Reproduce the dune-sand study
 
-The dataset is available through [Zenodo](https://doi.org/10.5281/zenodo.21717612). Download the following files from one selected version of the record:
+The dataset is available through [Zenodo](https://doi.org/10.5281/zenodo.21717612). Select one record version and download:
 
 | File | Contents |
 | --- | --- |
 | `BSE_full_resolution_images.tar.gz` | Seven full-resolution BSE images. |
 | `QEMSCAN_numerical_property_maps.tar.gz` | Numerical conductivity, Young's-modulus and Poisson-ratio maps. |
-| `reference_outputs_and_masks.tar.gz` | Admissibility masks, numerical reference outputs and execution logs; additional contents depend on the selected record version. |
+| `reference_outputs_and_masks.tar.gz` | Masks, numerical outputs and execution logs. |
 | `README_DATA.md` | Dataset documentation. |
-| `SHA256SUMS.txt` | Checksums for that record version. |
+| `SHA256SUMS.txt` | Checksums for that version. |
 
-Create a `data/` directory in the repository and place the five downloaded files there. From that directory, verify the checksums with `sha256sum -c SHA256SUMS.txt` on Linux or `shasum -a 256 -c SHA256SUMS.txt` on macOS.
-
-From the repository root, extract the archives:
+Put the files in `data/`. From that directory verify them with `sha256sum -c SHA256SUMS.txt` on Linux or `shasum -a 256 -c SHA256SUMS.txt` on macOS. Then, from the repository root:
 
 ```bash
-mkdir -p data
-
 tar -xzf data/BSE_full_resolution_images.tar.gz -C data
 tar -xzf data/QEMSCAN_numerical_property_maps.tar.gz -C data
 tar -xzf data/reference_outputs_and_masks.tar.gz -C data
-
 export REA_DATA_ROOT="$PWD/data"
 ```
 
-The extracted data directory must contain:
+The extracted directory contains `BSE/1_cut.tif` through `7_cut.tif`, `QEMSCAN/kappaMap_1.csv` through `kappaMap_7.csv`, corresponding `EMap_*.csv` and `nuMap_*.csv`, and `reference_outputs/`.
 
-| Relative path | Meaning |
-| --- | --- |
-| `BSE/1_cut.tif` … `BSE/7_cut.tif` | BSE image fields. |
-| `QEMSCAN/kappaMap_1.csv` … `kappaMap_7.csv` | Thermal conductivity, in W m^-1 K^-1. |
-| `QEMSCAN/EMap_1.csv` … `EMap_7.csv` | Young's modulus, in GPa. |
-| `QEMSCAN/nuMap_1.csv` … `nuMap_7.csv` | Poisson ratio, dimensionless. |
-| `reference_outputs/` | Archived masks, summaries and logs. |
+Follow **[docs/ORIGINAL_RUN_COMMANDS.md](docs/ORIGINAL_RUN_COMMANDS.md)** for all four raw-data stages with the exact study settings. That guide includes the complete commands for BSE screening, structural selection, property screening and periodic homogenization. Defaults alone do not reproduce those settings.
 
-The BSE pixel size used for physical length reporting is **1.31 micrometres**. The QEMSCAN property-map pixel size is **0.01 mm**. The structural spectrum is calculated in pixel coordinates using `--pixel-size 1`; physical side lengths are reported through a separate conversion.
-
-The numerical QEMSCAN CSVs are already classified and assigned material properties. The repository starts from these arrays; it does not reconstruct the upstream mineral classification from RGB illustrations. Use the CSV values directly. Intensity-rescaled visualization images do not preserve the physical property values required by the solver. The three property maps for each image must have matching dimensions and registration.
-
-## Run the complete analysis
-
-Run the following blocks in sequence from the repository root, with the virtual environment active. Check that each stage finishes successfully before starting the next one. Commands run in the foreground and write detailed progress to log files.
-
-### Prepare the input lists and a separate calculation directory
-
-The following setup writes fresh results to `outputs/full_run/reference_outputs/`. Symbolic links give the run directory the same layout as the downloaded dataset, allowing the plotting and validation scripts to use the fresh results later.
+To reconstruct the stored uncertainty and sensitivity outputs without the large images:
 
 ```bash
-REA_INPUT_ROOT="$REA_DATA_ROOT"
-REA_RUN_ROOT="$PWD/outputs/full_run"
-REA_RUN_DIR="$REA_RUN_ROOT/reference_outputs"
-mkdir -p "$REA_RUN_DIR"
-
-if [ ! -e "$REA_RUN_ROOT/BSE" ]; then
-  ln -s "$REA_INPUT_ROOT/BSE" "$REA_RUN_ROOT/BSE"
-fi
-if [ ! -e "$REA_RUN_ROOT/QEMSCAN" ]; then
-  ln -s "$REA_INPUT_ROOT/QEMSCAN" "$REA_RUN_ROOT/QEMSCAN"
-fi
-
-bse_files=()
-kappa_files=()
-elastic_files=()
-poisson_files=()
-for i in {1..7}; do
-  bse_files+=("$REA_INPUT_ROOT/BSE/${i}_cut.tif")
-  kappa_files+=("$REA_INPUT_ROOT/QEMSCAN/kappaMap_${i}.csv")
-  elastic_files+=("$REA_INPUT_ROOT/QEMSCAN/EMap_${i}.csv")
-  poisson_files+=("$REA_INPUT_ROOT/QEMSCAN/nuMap_${i}.csv")
-done
-```
-
-Keep this Bash session open so the variables and arrays remain available. The three core programs receive their inputs explicitly; the additional validation and figure scripts also recognize `REA_DATA_ROOT`.
-
-### 1. Detect admissible domains in the BSE images
-
-```bash
-python detect_stationary_domains_general.py "${bse_files[@]}" \
-  --input-type image --field-transform raw --max-side 0 \
-  --output-dir "$REA_RUN_DIR/stationary_domains_FULLRES_R2048_STRICT" \
-  --stationarity-window 2048 --stride 512 \
-  --tau-mu 0.02 --tau-sigma 0.06 --min-component-windows 4 --dpi 300 \
-  > "$REA_RUN_DIR/run_detect_stationary_domains_FULLRES_R2048_STRICT.log" 2>&1
-```
-
-This stage evaluates local means and standard deviations on moving 2048-pixel windows, with a stride of 512 pixels. It applies the configured tolerances, morphological opening/closing and connected-component filtering, then exports the pixel masks and local diagnostics.
-
-The mask files are named `1_cut_stationary_mask.tif` through `7_cut_stationary_mask.tif`. Their values indicate the domain available for subsequent window selection. The screening tests local marginal compatibility; the interpretation of that domain is discussed under [Read and interpret the results](#read-and-interpret-the-results).
-
-### 2. Determine the structural support
-
-```bash
-python rea_stationary_mask_cli_v24_general.py "${bse_files[@]}" \
-  --output-dir "$REA_RUN_DIR/combined_REA_final_STRICT_v24" \
-  --output-prefix REA_stationary_domains_STRICT_v24 \
-  --representative-image 1 --max-side 0 --pixel-size 1 --field-mode raw \
-  --stationary-mask-dir "$REA_RUN_DIR/stationary_domains_FULLRES_R2048_STRICT" \
-  --stationary-mask-suffix _stationary_mask.tif --min-mask-fraction 0.98 \
-  --window-sizes 256,384,512,640,768,896,1024,1280,1536,1792,2048 \
-  --reference-L 2048 --selected-spectra 256,512,1024,2048 \
-  --n-common-k-grid 600 --n-window-samples 121 --errorbar-mode sem \
-  --spectral-band low --low-k-fraction 0.25 --low-k-weight inverse \
-  --tau-Z 0.025 --tau-C 0.30 --tau-ens 0.10 --tail-fraction 0.5 \
-  --panel-b-mode raw+smooth --panel-b-smooth-window 3 \
-  --panel-c-mode raw+smooth --panel-c-smooth-window 3 --dpi 600 --no-pdf \
-  > "$REA_RUN_DIR/run_REA_stationary_STRICT_v24.log" 2>&1
-```
-
-For each support, candidate windows must have at least 98% mask coverage. The sampled means characterize their gray-level average, while a selected admissible window from each image supplies the spatial spectrum. The ensemble analysis compares support-dependent statistics with the 2048-pixel reference and applies the persistent joint selection rule.
-
-For the supplied dataset, the baseline selection is **1536 BSE pixels**, corresponding to **2.01216 mm**. The principal numerical output is:
-
-```text
-outputs/full_run/reference_outputs/combined_REA_final_STRICT_v24/REA_stationary_domains_STRICT_v24_combined_window_statistics.csv
-```
-
-Use a basename for `--output-prefix`: the program joins it to `--output-dir`. The explicit settings above reproduce the study's full-resolution protocol; running the program with its defaults selects different preprocessing and sampling settings.
-
-### 3. Detect admissible domains in the property maps
-
-```bash
-python detect_stationary_domains_general.py \
-  --kappa-maps "${kappa_files[@]}" \
-  --E-maps "${elastic_files[@]}" \
-  --nu-maps "${poisson_files[@]}" \
-  --stationarity-source combined --combined-transform log-robust --max-side 0 \
-  --output-dir "$REA_RUN_DIR/stationary_property_combined_STRICT" \
-  --stationarity-window 256 --stride 64 \
-  --tau-mu 0.02 --tau-sigma 0.06 --min-component-windows 4 --dpi 300 \
-  > "$REA_RUN_DIR/run_detect_stationary_property_combined_STRICT.log" 2>&1
-```
-
-This stage forms a combined screening field from the numerical conductivity, Young's-modulus and Poisson-ratio maps. The conductivity and modulus channels are log transformed and robustly standardized; Poisson ratio is robustly standardized without a logarithmic transform. Masks are generated on the property-map grid and are named `property_combined_1_stationary_mask.tif` through `property_combined_7_stationary_mask.tif`.
-
-### 4. Solve the periodic property problems
-
-```bash
-python property_full_homogenized_inside_property_masks.py \
-  --kappa-maps "${kappa_files[@]}" \
-  --E-maps "${elastic_files[@]}" \
-  --nu-maps "${poisson_files[@]}" \
-  --mask-dir "$REA_RUN_DIR/stationary_property_combined_STRICT" \
-  --mask-template 'property_combined_{i}_stationary_mask.tif' \
-  --output-dir "$REA_RUN_DIR/property_full_homogenized_property_masks_STRICT" \
-  --output-prefix figure5_property_full_homogenized_property_masks_STRICT \
-  --window-sizes 32,48,64,80,96,112,128,160,192,204,224,256,320,384,448,512 \
-  --L-rea 204 --property-pixel-size-mm 0.01 --min-mask-fraction 0.98 \
-  --n-window-samples 4 --elastic-mode plane_strain --errorbar-mode sem \
-  --rng-seed 12345 --dpi 600 --no-pdf \
-  > "$REA_RUN_DIR/run_property_full_homogenized_property_masks_STRICT.log" 2>&1
-```
-
-The nominal transferred support is **204 property-map pixels**, or **2.04 mm**. The solver evaluates two thermal and three elastic loading cases using periodic Q4 finite elements, 2 by 2 Gauss integration, zero-mean constraints and a sparse direct solve.
-
-The output directory contains a per-window response CSV, a support-wise summary CSV and response curves. The per-window file is `figure5_property_full_homogenized_property_masks_STRICT_window_values.csv`; it records conductivity, stiffness, axial moduli and elapsed times. Figure postprocessing inverts the full symmetric 3 by 3 stiffness matrix to obtain the compliance and shear modulus, retaining normal–shear coupling.
-
-After all four stages have succeeded, point the auxiliary scripts to this complete fresh run:
-
-```bash
-export REA_DATA_ROOT="$REA_RUN_ROOT"
-```
-
-To work with the downloaded reference outputs instead, use `export REA_DATA_ROOT="$PWD/data"`. This choice determines which images, masks and cell responses the subsequent data-dependent commands read.
-
-## Quantify uncertainty and parameter sensitivity
-
-The validation scripts assess how image sampling, candidate positions, mask screening and finite-reference choice affect the selected support. They use the core spectral, ensemble-aggregation and selection routines.
-
-### Reconstruct the stored analyses without raw-image processing
-
-From the repository root:
-
-```bash
-python validation/rea_validation_wrapper.py --aggregate --bootstrap 10000
+python validation/rea_validation_wrapper.py --aggregate --bootstrap 10000 --verify-reference
 python validation/rstat_sensitivity_wrapper.py --aggregate
 python validation/rebuild_derived.py
 ```
 
-These commands read `validation/checkpoints/` and write new numerical files to `outputs/validation/`. They reconstruct the stored analyses even when `REA_DATA_ROOT` points to a fresh run: **the default checkpoint source remains the bundled directory**.
+These commands read the bundled `validation/checkpoints/` and write to `outputs/validation/`. `--verify-reference` is an explicit study-only check; do not use it with a new dataset. `check_reference_results.py` additionally compares all stored reference values.
 
-| Generated file | Contents |
-| --- | --- |
-| `validation_results.json` | Baseline, masked and unmasked sampling comparisons, reference-availability checks, whole-image bootstrap and leave-one-image-out results. |
-| `rstat_sensitivity_results.json` | Results for screening-window sides 1536 and 3072 pixels at fixed stride. |
-| `reference_sensitivity_extra.json` | Shorter-reference tests and explicitly flagged exploratory reference calculations. |
-| `bootstrap_draws.npz` | Image indices, selected supports and spectral results for every bootstrap draw. |
-| `baseline_per_image_1.csv` … `baseline_per_image_7.csv` | Individual-image statistics across support sizes. |
-| `figure2_plot_data.npz` | Numerical series and spectra used by the Figure 2 plotter. |
-
-### Recompute the image statistics and screening masks
-
-To recompute the underlying statistics from the images and the selected data root, run the image jobs sequentially and explicitly pass their checkpoint directory to every aggregation command:
+To reproduce the figures using downloaded study data:
 
 ```bash
-for i in 1 2 3 4 5 6 7; do
-  python validation/rea_validation_wrapper.py \
-    --image "$i" --data-root "$REA_DATA_ROOT" \
-    --checkpoint-dir outputs/validation/checkpoints
-  python validation/rstat_sensitivity_wrapper.py \
-    --image "$i" --data-root "$REA_DATA_ROOT" \
-    --checkpoint-dir outputs/validation/checkpoints
-done
-
-python validation/rea_validation_wrapper.py \
-  --aggregate --bootstrap 10000 --data-root "$REA_DATA_ROOT" \
-  --checkpoint-dir outputs/validation/checkpoints
-python validation/rstat_sensitivity_wrapper.py \
-  --aggregate --data-root "$REA_DATA_ROOT" \
-  --checkpoint-dir outputs/validation/checkpoints
-python validation/rebuild_derived.py \
-  --checkpoint-dir outputs/validation/checkpoints
+python figures/regenerate_figure1_layout.py --data-root "$REA_DATA_ROOT"
+python figures/regenerate_figure2_layout.py --data-root "$REA_DATA_ROOT"
+python figures/regenerate_revised_figures.py --data-root "$REA_DATA_ROOT" --study-preset
 ```
 
-The structural wrapper reads the baseline masks under `REA_DATA_ROOT/reference_outputs/stationary_domains_FULLRES_R2048_STRICT/`. The screening-sensitivity wrapper recomputes alternative masks at 1536 and 3072 pixels. `--output-dir` changes the numerical-output destination; `--checkpoint-dir` controls which per-image records are written or read. `rebuild_derived.py` reads checkpoints and does not take a `--data-root` argument.
-
-The reconstruction wrappers encode the supplied study's seven-image protocol and baseline checks. They are not a general bootstrap interface for an arbitrary number of images. See [validation/README.md](validation/README.md) for the checkpoint format and verification details.
-
-## Generate the figures
-
-The figure scripts use numerical arrays and archived or freshly computed outputs. They write PNG and PDF files.
-
-| Figure | Scientific content | Main inputs |
-| --- | --- | --- |
-| Figure 1 | Image field, admissible domain and local screening diagnostics | BSE image 4, its mask and window-diagnostic CSV. |
-| Figure 2 | Structural mean, spectral convergence and selected spectra | BSE image 1 and a numerical plotting NPZ. |
-| Figure 3 | Phase fractions, conductivity, stiffness and axial/shear moduli | Seven property maps and solved cell responses, or the equivalent compact inputs. |
-| Supplementary property-map figure | Mineral/property-map illustration | Numerical maps for image 1. |
-
-### Figures from the downloaded reference data
-
-```bash
-python figures/regenerate_figure1_layout.py --data-root "$PWD/data"
-python figures/regenerate_figure2_layout.py --data-root "$PWD/data"
-python figures/regenerate_revised_figures.py --data-root "$PWD/data"
-```
-
-Figure 2 uses the bundled `derived_data/figure2_plot_data.npz` by default. Figures 1 and 2 are written under `outputs/figures/`; Figure 3 and the supplementary map figure are written under `outputs/revised_figures/IMG/`, with derived tables under `outputs/revised_figures/derived_data/`.
-
-Figure 3 and the supplementary map illustration can also be generated without downloading the raw data, using only the compact inputs:
+`--study-preset` selects the study's mineral assignments, 0.01 mm property calibration and nominal 2.04 mm support marker. Figure 2 uses the bundled numerical curves unless `--data-file` is supplied. A compact property-figure route requires no downloaded maps:
 
 ```bash
 env -u REA_DATA_ROOT python figures/regenerate_revised_figures.py
 ```
 
-Unsetting the environment variable for this one command ensures that the plotter selects its bundled inputs.
+## Analyse N new images
 
-### Figures from a fresh full calculation
+### Inputs and calibration
 
-After completing the four-stage calculation and recomputing the validation checkpoints above:
+Use one 2D grayscale field per image file, with unique filename stems such as `sample_A.tif`, `sample_B.tif`, etc. The documented structural pipeline uses the original **8-bit grayscale (`L`) conversion**, raw contrast and full image resolution. Higher-bit-depth or color information is not preserved by that conversion; prepare a justified, consistent grayscale representation before using this workflow. This is not an automatic segmentation or mineral-classification program.
+
+All images pooled into one analysis should represent the intended sampling population and share the same pixel calibration and intensity interpretation. Image dimensions may differ, but the support sequence must be feasible across the ensemble. Overlapping crops are not independent realizations for whole-image bootstrap uncertainty. Keep one input dataset and one parameter configuration in each run directory.
+
+The following example uses the study's numerical settings to show a complete workflow. **Choose the support sizes, screening scales, reference, tolerances and pixel calibration for your own data.** The example requires images and admissible regions large enough to contain the tested supports; copying it onto small images will not produce a meaningful estimate. Support sizes and screening strides are in pixels.
+
+### 1. Select all images and settings
+
+Create a directory containing only the images to analyse. A glob automatically supplies all 9, 20 or N matching files; filenames need not contain numbers. Keep this Bash session open for the subsequent commands.
 
 ```bash
-python figures/regenerate_figure1_layout.py --data-root "$REA_RUN_ROOT"
-python figures/regenerate_figure2_layout.py \
-  --data-root "$REA_RUN_ROOT" \
-  --data-file outputs/validation/figure2_plot_data.npz
-python figures/regenerate_revised_figures.py --data-root "$REA_RUN_ROOT"
+INPUT_IMAGES="/absolute/path/to/my_images"
+RUN="$PWD/outputs/my_dataset"
+mkdir -p "$RUN"
+shopt -s nullglob
+images=("$INPUT_IMAGES/"*.tif)
+if (( ${#images[@]} == 0 )); then
+  echo "No TIFF images found; check INPUT_IMAGES and the file extension." >&2
+  exit 1
+fi
+printf 'Using %s images\n' "${#images[@]}"
+
+WINDOWS=256,384,512,640,768,896,1024,1280,1536,1792,2048
+REFERENCE=2048
+SPECTRA=256,512,1024,2048
+RSTAT=2048
+STRIDE=512
+PIXEL_MM=0.00131
+N_SAMPLES=121
+TAU_MU=0.02
+TAU_SIGMA=0.06
+TAU_Z=0.025
+TAU_C=0.30
+MASK_FRACTION=0.98
 ```
 
-The explicit `--data-file` directs Figure 2 to the newly reconstructed curves. Each plotter accepts `--output-dir` if separate destinations are needed for archived and fresh figures. The programs retain their existing output filenames, including the `_revised` suffix.
+Replace `*.tif` with the appropriate extension, or supply an explicit ordered array such as `images=("/path/field A.tif" "/path/field B.tif")`. Quoted arrays support spaces in paths. The same order is used for one-based image IDs throughout the run. These input files need not be called `1_cut.tif`, etc.
 
-Figures 1 and 2 use four equal plot areas and external bold panel letters. Spectral curves in Figure 2 are peak-normalized for display; the selection uses the unnormalized spectra. Its white square indicates the selected support size and does not identify the actual admissible spectral-window location. Figure 3 uses a linear phase-fraction scale and derives `Gxy = 1/S33` from the full compliance matrix. Further plotting details are in [figures/README.md](figures/README.md).
+### 2. Screen admissible domains
+
+```bash
+python detect_stationary_domains_general.py "${images[@]}" \
+  --input-type image --field-transform raw --max-side 0 \
+  --output-dir "$RUN/masks" \
+  --stationarity-window "$RSTAT" --stride "$STRIDE" \
+  --tau-mu "$TAU_MU" --tau-sigma "$TAU_SIGMA" \
+  --min-component-windows 4 --dpi 300
+```
+
+For `sample_A.tif`, this produces `sample_A_stationary_mask.tif` and `sample_A_stationary_windows.csv` in `$RUN/masks`, plus other diagnostics. Masks match their image dimensions. Review the retained domain and diagnostic maps before interpreting a structural estimate. The morphological operations remain enabled.
+
+### 3. Determine structural support
+
+```bash
+python rea_stationary_mask_cli_v24_general.py "${images[@]}" \
+  --output-dir "$RUN/structural" --output-prefix REA \
+  --representative-image 1 --max-side 0 --pixel-size 1 --field-mode raw \
+  --stationary-mask-dir "$RUN/masks" \
+  --stationary-mask-suffix _stationary_mask.tif \
+  --min-mask-fraction "$MASK_FRACTION" \
+  --window-sizes "$WINDOWS" --reference-L "$REFERENCE" \
+  --selected-spectra "$SPECTRA" --n-common-k-grid 600 \
+  --n-window-samples "$N_SAMPLES" --errorbar-mode sem \
+  --spectral-band low --low-k-fraction 0.25 --low-k-weight inverse \
+  --tau-Z "$TAU_Z" --tau-C "$TAU_C" --tau-ens 0.10 --tail-fraction 0.5 \
+  --panel-b-mode raw+smooth --panel-b-smooth-window 3 \
+  --panel-c-mode raw+smooth --panel-c-smooth-window 3 --dpi 300 --no-pdf
+```
+
+The principal output is `$RUN/structural/REA_combined_window_statistics.csv`. Use a basename for `--output-prefix`. The spectrum remains in pixel coordinates (`--pixel-size 1`); multiply selected side lengths by `PIXEL_MM` for millimetres. The actual reference can fall back to the largest common admissible support if the requested reference is unavailable; inspect the reported reference and available sizes.
+
+The original structural program requires enough common admissible supports. If there are too few, it can stop with an informative error. The validation workflow below additionally records insufficient support and non-selection in machine-readable output. An absent selection is a result to report, not a size to replace with the largest window.
+
+## Uncertainty and sensitivity for N images
+
+The wrappers import the unchanged numerical routines. They support the full-resolution, raw grayscale, low-wavenumber protocol shown above; they do not mirror every alternative preprocessing mode of the core command-line program.
+
+Define the wrapper settings once and pass the same configuration to both image-processing commands. This example tests screening sides 1536 and 3072, shorter references 1536 and 1792, and larger-reference availability through 4096. Adjust those sizes together with your baseline grid. At least four distinct structural support sizes are required, and the requested reference must be in that grid.
+
+```bash
+analysis_options=(
+  --images "${images[@]}"
+  --mask-dir "$RUN/masks"
+  --window-sizes "$WINDOWS" --reference-L "$REFERENCE"
+  --selected-spectra "$SPECTRA"
+  --n-window-samples "$N_SAMPLES" --n-common-k-grid 600
+  --tau-Z "$TAU_Z" --tau-C "$TAU_C"
+  --min-mask-fraction "$MASK_FRACTION" --tail-fraction 0.5
+  --low-k-fraction 0.25 --low-k-weight inverse
+  --extra-reference-sizes 2560,3072,3584,4096
+  --short-reference-sizes 1536,1792
+  --screening-sizes 1536,3072 --screening-stride "$STRIDE"
+  --screening-tau-mu "$TAU_MU" --screening-tau-sigma "$TAU_SIGMA"
+  --min-component-windows 4 --pixel-size-mm "$PIXEL_MM"
+)
+
+python validation/rea_validation_wrapper.py --all-images \
+  "${analysis_options[@]}" \
+  --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation"
+
+python validation/rstat_sensitivity_wrapper.py --all-images \
+  "${analysis_options[@]}" \
+  --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation"
+
+python validation/rea_validation_wrapper.py --aggregate \
+  --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation" \
+  --expected-images "${#images[@]}" --bootstrap 10000 --seed 20261029
+
+python validation/rstat_sensitivity_wrapper.py --aggregate \
+  --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation" \
+  --expected-images "${#images[@]}"
+
+python validation/rebuild_derived.py \
+  --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation" \
+  --expected-images "${#images[@]}"
+```
+
+`--all-images` processes N images sequentially. To process one position, replace it with `--image 3` while retaining the **complete input list** and settings. An alternative is `--data-root /path/to/dataset`, which discovers images under `BSE/`; explicit `--images` avoids study-specific directory assumptions. Use `--masks PATH...` instead of `--mask-dir` for explicitly paired mask files.
+
+Always pass the same `--checkpoint-dir` to processing, aggregation and reconstruction. Omitting it during aggregation selects the bundled seven-image checkpoints. A new dataset or configuration needs a new checkpoint directory. Stored metadata records ordered image and mask paths, file sizes and modification times, and configuration. The wrappers reject incomplete or mixed populations and changed inputs at checkpoint-writing time. These metadata checks are not content checksums. Aggregation reads the stored metadata and can run without access to the original image files.
+
+Each bootstrap draw samples **N images with replacement from the N supplied images**. Supports remain linked within each image. Leave-one-image-out analysis creates N exclusions when N > 1. With one image, independent-image uncertainty cannot be estimated; output marks the degenerate bootstrap and omits leave-one-image-out estimates.
+
+| Generated file in `$RUN/validation` | Contents |
+| --- | --- |
+| `validation_results.json` | Baseline, masked/unmasked sampling comparisons, availability, bootstrap and leave-one-image-out results. |
+| `bootstrap_draws.npz` | Draw indices, selected supports and spectral results. |
+| `baseline_per_image_1.csv` … `baseline_per_image_N.csv` | Individual-image structural statistics, when a baseline curve can be calculated. |
+| `rstat_sensitivity_results.json` | Configured screening-window experiments. |
+| `reference_sensitivity_extra.json` | Shorter-reference and explicitly flagged exploratory larger-reference diagnostics. |
+| `figure2_plot_data.npz` | Curves, selected spectra, calibration and selected support for Figure 2. |
+
+A non-selection remains explicit, including when every bootstrap draw fails or no common support is available. Successful-only percentiles must be reported together with the failure fraction. Extra-reference diagnostics that bypass the 49-position availability check are marked `enforces_original49_common_size_gate: false` and must not be presented as production-protocol results. See [validation/README.md](validation/README.md) for defaults and file formats.
+
+## Independent property calculations
+
+This stage is optional when only structural support is being studied. To assess thermal and elastic response, supply **numerical**, registered conductivity, Young's-modulus and Poisson-ratio maps. The three maps within each triplet must have identical shapes and corresponding pixels. Use conductivity in W m^-1 K^-1, Young's modulus in GPa and dimensionless Poisson ratio. Do not use intensity-rescaled illustrations as physical inputs.
+
+The number of property-map triplets is inferred from their lists. It need not equal the structural-image count, but its sampling population and correspondence must be justified. The shell loop below pairs standard filenames by suffix, avoiding accidental list-order mismatches. Change the paths and filenames to match your data; explicit ordered arrays also work.
+
+```bash
+PROPERTY_DIR="/absolute/path/to/numerical_maps"
+kappa_files=("$PROPERTY_DIR/"kappaMap_*.csv)
+elastic_files=()
+poisson_files=()
+if (( ${#kappa_files[@]} == 0 )); then
+  echo "No numerical property maps found." >&2
+  exit 1
+fi
+for kappa in "${kappa_files[@]}"; do
+  map_id="${kappa##*/kappaMap_}"
+  map_id="${map_id%.csv}"
+  efile="$PROPERTY_DIR/EMap_${map_id}.csv"
+  nufile="$PROPERTY_DIR/nuMap_${map_id}.csv"
+  if [[ ! -f "$efile" || ! -f "$nufile" ]]; then
+    echo "Incomplete property-map triplet: $map_id" >&2
+    exit 1
+  fi
+  elastic_files+=("$efile")
+  poisson_files+=("$nufile")
+done
+
+PROPERTY_PIXEL_MM=0.01
+PROPERTY_RSTAT=256
+PROPERTY_STRIDE=64
+PROPERTY_WINDOWS=32,48,64,80,96,112,128,160,192,204,224,256,320,384,448,512
+PROPERTY_REA_PIXELS=204
+```
+
+The values above illustrate the study's property settings. Set your own screening scales and support sequence. Convert a structural side to the property grid using `L_property_pixels = L_structural_pixels × structural_pixel_mm / property_pixel_mm`; choose and record an integer rounding convention. The original run used a **nominal 204-pixel (2.04 mm)** transfer. That is not the exact nearest-integer conversion of 1536 × 0.00131 / 0.01, which is 201.216 pixels. For a new dataset, use its measured support and calibration rather than copying 204.
+
+```bash
+python detect_stationary_domains_general.py \
+  --kappa-maps "${kappa_files[@]}" --E-maps "${elastic_files[@]}" \
+  --nu-maps "${poisson_files[@]}" \
+  --stationarity-source combined --combined-transform log-robust --max-side 0 \
+  --output-dir "$RUN/property_masks" \
+  --stationarity-window "$PROPERTY_RSTAT" --stride "$PROPERTY_STRIDE" \
+  --tau-mu "$TAU_MU" --tau-sigma "$TAU_SIGMA" \
+  --min-component-windows 4 --dpi 300
+
+python property_full_homogenized_inside_property_masks.py \
+  --kappa-maps "${kappa_files[@]}" --E-maps "${elastic_files[@]}" \
+  --nu-maps "${poisson_files[@]}" \
+  --mask-dir "$RUN/property_masks" \
+  --mask-template 'property_combined_{i}_stationary_mask.tif' \
+  --output-dir "$RUN/properties" --output-prefix properties \
+  --window-sizes "$PROPERTY_WINDOWS" --L-rea "$PROPERTY_REA_PIXELS" \
+  --property-pixel-size-mm "$PROPERTY_PIXEL_MM" \
+  --min-mask-fraction "$MASK_FRACTION" --n-window-samples 4 \
+  --elastic-mode plane_strain --errorbar-mode sem \
+  --rng-seed 12345 --dpi 300 --no-pdf
+```
+
+The detector numbers property masks by one-based **list position**, so use exactly the same list order in both commands. The combined screening field log-transforms and robustly standardizes conductivity and modulus; Poisson ratio is robustly standardized without a logarithm. Positive, physically appropriate coefficients are needed for the cell problems.
+
+The solver uses periodic Q4 elements, 2 × 2 Gauss integration, zero-mean constraints and sparse direct solves for two thermal and three elastic loading cases. The per-window responses are saved to `$RUN/properties/properties_window_values.csv`, alongside a support-wise summary and plots. The mechanical assumption here is **2D plane strain**. The figure postprocessor inverts the full 3 × 3 stiffness matrix to obtain `Ex = 1/S11`, `Ey = 1/S22` and `Gxy = 1/S33`, including directional coupling.
+
+## Generate figures for your dataset
+
+Use explicit paths so all panels refer to the new calculation:
+
+```bash
+example_image="${images[0]}"
+example_stem="${example_image##*/}"
+example_stem="${example_stem%.*}"
+
+python figures/regenerate_figure1_layout.py \
+  --image-file "$example_image" \
+  --mask-file "$RUN/masks/${example_stem}_stationary_mask.tif" \
+  --windows-file "$RUN/masks/${example_stem}_stationary_windows.csv" \
+  --output-dir "$RUN/figures"
+
+python figures/regenerate_figure2_layout.py \
+  --image-file "$example_image" \
+  --data-file "$RUN/validation/figure2_plot_data.npz" \
+  --pixel-size-mm "$PIXEL_MM" --output-dir "$RUN/figures"
+
+python figures/regenerate_revised_figures.py \
+  --kappa-maps "${kappa_files[@]}" --E-maps "${elastic_files[@]}" \
+  --nu-maps "${poisson_files[@]}" \
+  --window-values "$RUN/properties/properties_window_values.csv" \
+  --property-pixel-size-mm "$PROPERTY_PIXEL_MM" \
+  --rea-pixels "$PROPERTY_REA_PIXELS" \
+  --output-dir "$RUN/property_figures"
+```
+
+Run the third command only after the property calculations. Omit `--rea-pixels` when no structural support was selected. Supplying only `--window-values` produces response plots without requiring maps. To add phase-composition plots, supply an explicit `--phase-table` with `name,kappa,E,nu` entries; see [figures/README.md](figures/README.md). Generic maps receive no automatic dune-sand mineral names. Use `--study-preset` only with the original material assignments.
+
+Figures 1 and 2 have four equal panel areas, external bold panel letters and no panel titles. Their image aspect ratios are preserved. Figure 2 discovers the available spectrum keys and marks non-selection without an REA box or selection line. A selected-size square is schematic, not the location of the actual spectral window. Spectra are peak-normalized for display only; selection uses unnormalized spectra. `--pixel-size-mm` converts support and wavenumber axes assuming `dx=1`; image coordinates remain in pixels.
+
+Figure 3 uses all supplied map sets and response-image IDs. Without a phase table it contains three property-response panels; with a phase table it also includes composition. Reduced image populations are identified from the actual response data. Single-window SEM remains undefined. PNG and PDF outputs are generated, retaining the historical `_revised` filenames for compatibility. Use `--dpi` for lower-resolution previews.
 
 ## Read and interpret the results
+
+These reference values describe the dune-sand dataset, not expected results for new images.
 
 ### Structural support and numerical conventions
 
@@ -399,15 +420,20 @@ Recorded cell-solve times total approximately 420.79 seconds. Hardware and threa
 
 ### File formats
 
-CSV files contain numerical tables. NPZ files contain NumPy arrays and can be opened with `numpy.load(path, allow_pickle=False)`. Checkpoints use gzip-compressed JSON with explicit array shapes and dtypes. In result JSON, `null` identifies an undefined or unavailable value according to the field. In `bootstrap_draws.npz`, an infinite value in `selected_pixels` is a non-selection marker, not a measurement of an infinite physical support.
+CSV files contain numerical tables. NPZ files contain NumPy arrays and can be opened with `numpy.load(path, allow_pickle=False)`. Checkpoints use gzip-compressed JSON with explicit array shapes and dtypes. In Figure 2 NPZ files, numeric NaN in `accepted_L` marks non-selection. In result JSON, `null` identifies an undefined or unavailable value according to the field. In `bootstrap_draws.npz`, an infinite value in `selected_pixels` is a non-selection marker, not a measurement of an infinite physical support.
 
-## Apply the programs to another dataset
+## Troubleshooting
 
-Use the three core programs' command-line options to supply new fields and choose analysis parameters. Define the pixel calibration, candidate support sequence, reference size, screening window and tolerances for the material and imaging conditions being studied. Check that admissible supports exist across the image ensemble before interpreting a selected size.
-
-For property calculations, supply registered numerical conductivity, Young's-modulus and Poisson-ratio maps in consistent units, with masks defined on the same grid. Choose the appropriate mechanical assumption and document its relationship to the physical problem. A structural support determined from another image channel should be assessed against independent property responses at the corresponding physical length.
-
-The figures, phase assignments and seven-image validation wrappers in this repository are configured for the dune-sand study. Adapt those dataset-specific components before using them elsewhere. Report non-selections and sensitivity to the reference, screening and sampling choices along with any selected support.
+| Symptom | Action |
+| --- | --- |
+| No images or missing masks | Check the glob/extension, unique image stems, mask suffix and matching dimensions. |
+| Checkpoint dataset/configuration mismatch | Start a new checkpoint directory for changed inputs or settings; do not mix records from different runs. |
+| Incomplete checkpoint set | Process every input position before aggregation; retain the same complete list for individual jobs. |
+| Unexpected seven-image result | Pass your own `--checkpoint-dir` to every aggregation/reconstruction command and your new `--data-file` to Figure 2. |
+| No common support or no selected REA | Inspect mask coverage, image dimensions, support grid, reference and tolerances. Report non-selection and sensitivity; a finite REA is not guaranteed. |
+| No property windows at large supports | Inspect per-image availability. The response population may shrink with increasing support. |
+| Memory exhaustion | Reduce input dimensions only with a justified resolution study, use a larger-memory machine, or use the sequential checkpoint workflow for structural uncertainty. |
+| Wrong phase labels on a new material | Omit `--study-preset` and supply your own phase table only when its assignments are valid. |
 
 ## Reproducibility, citation and license
 

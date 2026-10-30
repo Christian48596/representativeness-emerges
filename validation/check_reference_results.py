@@ -34,7 +34,7 @@ def main():
   assert actual==expected,(name,actual)
  with tempfile.TemporaryDirectory(prefix='rea-verification-') as td:
   out=Path(td)
-  for script,args in [('rea_validation_wrapper.py',['--aggregate','--bootstrap','10000']),('rstat_sensitivity_wrapper.py',['--aggregate']),('rebuild_derived.py',[])]:
+  for script,args in [('rea_validation_wrapper.py',['--aggregate','--bootstrap','10000','--verify-reference']),('rstat_sensitivity_wrapper.py',['--aggregate']),('rebuild_derived.py',[])]:
    result=subprocess.run([sys.executable,str(REPO/'validation'/script),*args,'--output-dir',str(out)],capture_output=True,text=True)
    if result.returncode:
     print(result.stdout);print(result.stderr,file=sys.stderr);raise SystemExit(result.returncode)
