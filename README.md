@@ -6,7 +6,7 @@ This repository provides a Python workflow for determining the spatial support o
 
 The accompanying study applies this framework to two-dimensional polished sections of dune sand. Backscattered-electron (BSE) images provide the structural information. Numerical property maps derived from QEMSCAN mineralogical classifications provide independent conductivity and elasticity fields. The repository contains the analysis programs, reference statistics, uncertainty and sensitivity calculations, and scripts for producing the manuscript figures.
 
-The workflow accepts **N two-dimensional images**, including 9, 20 or more, without editing Python source. Input lists determine N. The uncertainty, sensitivity and plotting programs use the supplied dataset and its parameters. The bundled seven-image dune-sand results remain available as a reproducibility reference.
+The workflow accepts **N two-dimensional images**, including 9, 20 or more, without editing Python source. Input lists determine N. The uncertainty, sensitivity and plotting programs use the supplied dataset and its parameters. The bundled seven-image dune-sand results provide a reproducibility reference.
 
 ## Contents
 
@@ -39,18 +39,20 @@ The implemented calculations operate on **two-dimensional fields**. The represen
 | File or directory | Role |
 | --- | --- |
 | [`detect_stationary_domains_general.py`](detect_stationary_domains_general.py) | Detect statistically admissible domains in image fields or combined numerical property maps. |
-| [`rea_stationary_mask_cli_v24_general.py`](rea_stationary_mask_cli_v24_general.py) | Evaluate structural statistics and spectra across support sizes and select a persistent structural support. |
+| [`rea_stationary_mask.py`](rea_stationary_mask.py) | Evaluate structural statistics and spectra across support sizes and select a persistent structural support. |
 | [`property_full_homogenized_inside_property_masks.py`](property_full_homogenized_inside_property_masks.py) | Solve periodic thermal and elastic cell problems inside admissible property-map domains. |
 | [`validation/`](validation/) | Bootstrap, sensitivity, numerical reconstruction and verification scripts. |
 | [`validation/checkpoints/`](validation/checkpoints/) | Compressed per-image statistics and spectra for reproducing the uncertainty analysis without processing the large images again. |
 | [`validation/results/`](validation/results/) | Reference bootstrap, sensitivity and per-image results. |
 | [`validation/inputs/`](validation/inputs/) | Archived structural summary used for numerical comparison. |
-| [`figures/`](figures/) | Scripts for Figures 1–3 and the supplementary property-map illustration. |
+| [`figures/figure_1.py`](figures/figure_1.py) | Assemble manuscript Figure 1: image, admissibility mask and screening diagnostics. |
+| [`figures/figure_2.py`](figures/figure_2.py) | Assemble manuscript Figure 2: structural mean, convergence residuals and spectra. |
+| [`figures/figure_3.py`](figures/figure_3.py) | Assemble manuscript Figure 3: phase fractions and thermal/elastic responses; also export the property-map illustration. |
 | [`derived_data/`](derived_data/) | Compact numerical plotting inputs, phase fractions and property summaries. |
-| [`docs/ORIGINAL_RUN_COMMANDS.md`](docs/ORIGINAL_RUN_COMMANDS.md) | Additional documentation of the study's computational settings. |
+| [`docs/STUDY_WORKFLOW.md`](docs/STUDY_WORKFLOW.md) | Complete study workflow, from raw data to assembled manuscript figures. |
 | [`tests/test_n_images.py`](tests/test_n_images.py) | Synthetic 9- and 20-image integration checks and input/error cases. |
 | [`requirements.txt`](requirements.txt) | Required Python packages. |
-| [`requirements-revision.txt`](requirements-revision.txt) | Pinned package versions used to verify the numerical reconstruction. |
+| [`requirements-pinned.txt`](requirements-pinned.txt) | Pinned package versions used to verify the numerical reconstruction. |
 
 Large images, full-resolution masks and numerical property maps are distributed through Zenodo. Generated outputs are written under `outputs/` by the commands below.
 
@@ -66,7 +68,7 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-For the recorded package versions, use `python -m pip install -r requirements-revision.txt` in a Python 3.12 environment.
+For the recorded package versions, use `python -m pip install -r requirements-pinned.txt` in a Python 3.12 environment.
 
 Check the bundled scientific reference and the N-image interfaces:
 
@@ -75,17 +77,17 @@ python validation/check_reference_results.py
 python -m unittest discover -s tests -p 'test_n_images.py' -v
 ```
 
-The reference check reconstructs the stored baseline, all 10,000 bootstrap draws, leave-one-image-out results, sensitivity results and Figure 2 arrays. It compares scientific values with the bundled references and independently verifies the three original computational scripts. It needs no downloaded images. The tests exercise distinct synthetic datasets with 9 and 20 images, matched property maps, thermal and plane-strain elastic solutions, custom figures, incomplete inputs and non-selection cases. Synthetic tests verify software behavior; the physical validation remains the dune-sand study.
+The reference check reconstructs the stored baseline, all 10,000 bootstrap draws, leave-one-image-out results, sensitivity results and Figure 2 arrays. It compares scientific values with the bundled references and independently verifies the three computational source files. It needs no downloaded images. The tests exercise distinct synthetic datasets with 9 and 20 images, matched property maps, thermal and plane-strain elastic solutions, custom figures, incomplete inputs and non-selection cases. Synthetic tests verify software behavior; the physical validation remains the dune-sand study.
 
 Every program accepts `--help`. For example:
 
 ```bash
-python rea_stationary_mask_cli_v24_general.py --help
-python validation/rea_validation_wrapper.py --help
-python figures/regenerate_revised_figures.py --help
+python rea_stationary_mask.py --help
+python validation/structural_uncertainty.py --help
+python figures/figure_3.py --help
 ```
 
-N is not fixed by the software, but image size, memory and FEM cost limit practical runs. The original structural program holds the image ensemble in memory; validation wrappers process one image at a time. Each original full-resolution BSE field contains approximately 205 million pixels, so start with the compact verification on a memory-limited machine.
+N is not fixed by the software, but image size, memory and FEM cost limit practical runs. The structural program holds the image ensemble in memory; the uncertainty and sensitivity programs process one image at a time. Each study BSE field at full resolution contains approximately 205 million pixels, so start with the compact verification on a memory-limited machine.
 
 ## Reproduce the dune-sand study
 
@@ -110,14 +112,14 @@ export REA_DATA_ROOT="$PWD/data"
 
 The extracted directory contains `BSE/1_cut.tif` through `7_cut.tif`, `QEMSCAN/kappaMap_1.csv` through `kappaMap_7.csv`, corresponding `EMap_*.csv` and `nuMap_*.csv`, and `reference_outputs/`.
 
-Follow **[docs/ORIGINAL_RUN_COMMANDS.md](docs/ORIGINAL_RUN_COMMANDS.md)** for all four raw-data stages with the exact study settings. That guide includes the complete commands for BSE screening, structural selection, property screening and periodic homogenization. Defaults alone do not reproduce those settings.
+Follow **[docs/STUDY_WORKFLOW.md](docs/STUDY_WORKFLOW.md)** for the complete calculation and manuscript-figure assembly with the study settings. That guide includes the complete commands for BSE screening, structural selection, property screening, periodic homogenization and figure assembly. Defaults alone do not reproduce those settings.
 
 To reconstruct the stored uncertainty and sensitivity outputs without the large images:
 
 ```bash
-python validation/rea_validation_wrapper.py --aggregate --bootstrap 10000 --verify-reference
-python validation/rstat_sensitivity_wrapper.py --aggregate
-python validation/rebuild_derived.py
+python validation/structural_uncertainty.py --aggregate --bootstrap 10000 --verify-reference
+python validation/screening_sensitivity.py --aggregate
+python validation/build_plot_data.py
 ```
 
 These commands read the bundled `validation/checkpoints/` and write to `outputs/validation/`. `--verify-reference` is an explicit study-only check; do not use it with a new dataset. `check_reference_results.py` additionally compares all stored reference values.
@@ -125,22 +127,22 @@ These commands read the bundled `validation/checkpoints/` and write to `outputs/
 To reproduce the figures using downloaded study data:
 
 ```bash
-python figures/regenerate_figure1_layout.py --data-root "$REA_DATA_ROOT"
-python figures/regenerate_figure2_layout.py --data-root "$REA_DATA_ROOT"
-python figures/regenerate_revised_figures.py --data-root "$REA_DATA_ROOT" --study-preset
+python figures/figure_1.py --data-root "$REA_DATA_ROOT"
+python figures/figure_2.py --data-root "$REA_DATA_ROOT"
+python figures/figure_3.py --data-root "$REA_DATA_ROOT" --study-preset
 ```
 
 `--study-preset` selects the study's mineral assignments, 0.01 mm property calibration and nominal 2.04 mm support marker. Figure 2 uses the bundled numerical curves unless `--data-file` is supplied. A compact property-figure route requires no downloaded maps:
 
 ```bash
-env -u REA_DATA_ROOT python figures/regenerate_revised_figures.py
+env -u REA_DATA_ROOT python figures/figure_3.py
 ```
 
 ## Analyse N new images
 
 ### Inputs and calibration
 
-Use one 2D grayscale field per image file, with unique filename stems such as `sample_A.tif`, `sample_B.tif`, etc. The documented structural pipeline uses the original **8-bit grayscale (`L`) conversion**, raw contrast and full image resolution. Higher-bit-depth or color information is not preserved by that conversion; prepare a justified, consistent grayscale representation before using this workflow. This is not an automatic segmentation or mineral-classification program.
+Use one 2D grayscale field per image file, with unique filename stems such as `sample_A.tif`, `sample_B.tif`, etc. The documented structural pipeline uses an **8-bit grayscale (`L`) conversion**, raw contrast and full image resolution. Higher-bit-depth or color information is not preserved by that conversion; prepare a justified, consistent grayscale representation before using this workflow. This is not an automatic segmentation or mineral-classification program.
 
 All images pooled into one analysis should represent the intended sampling population and share the same pixel calibration and intensity interpretation. Image dimensions may differ, but the support sequence must be feasible across the ensemble. Overlapping crops are not independent realizations for whole-image bootstrap uncertainty. Keep one input dataset and one parameter configuration in each run directory.
 
@@ -194,7 +196,7 @@ For `sample_A.tif`, this produces `sample_A_stationary_mask.tif` and `sample_A_s
 ### 3. Determine structural support
 
 ```bash
-python rea_stationary_mask_cli_v24_general.py "${images[@]}" \
+python rea_stationary_mask.py "${images[@]}" \
   --output-dir "$RUN/structural" --output-prefix REA \
   --representative-image 1 --max-side 0 --pixel-size 1 --field-mode raw \
   --stationary-mask-dir "$RUN/masks" \
@@ -211,13 +213,13 @@ python rea_stationary_mask_cli_v24_general.py "${images[@]}" \
 
 The principal output is `$RUN/structural/REA_combined_window_statistics.csv`. Use a basename for `--output-prefix`. The spectrum remains in pixel coordinates (`--pixel-size 1`); multiply selected side lengths by `PIXEL_MM` for millimetres. The actual reference can fall back to the largest common admissible support if the requested reference is unavailable; inspect the reported reference and available sizes.
 
-The original structural program requires enough common admissible supports. If there are too few, it can stop with an informative error. The validation workflow below additionally records insufficient support and non-selection in machine-readable output. An absent selection is a result to report, not a size to replace with the largest window.
+The structural program requires enough common admissible supports. If there are too few, it can stop with an informative error. The validation workflow below additionally records insufficient support and non-selection in machine-readable output. An absent selection is a result to report, not a size to replace with the largest window.
 
 ## Uncertainty and sensitivity for N images
 
-The wrappers import the unchanged numerical routines. They support the full-resolution, raw grayscale, low-wavenumber protocol shown above; they do not mirror every alternative preprocessing mode of the core command-line program.
+The uncertainty and sensitivity programs import the core numerical routines. They support the full-resolution, raw grayscale, low-wavenumber protocol shown above; they do not mirror every alternative preprocessing mode of the core command-line program.
 
-Define the wrapper settings once and pass the same configuration to both image-processing commands. This example tests screening sides 1536 and 3072, shorter references 1536 and 1792, and larger-reference availability through 4096. Adjust those sizes together with your baseline grid. At least four distinct structural support sizes are required, and the requested reference must be in that grid.
+Define the analysis settings once and pass the same configuration to both image-processing commands. This example tests screening sides 1536 and 3072, shorter references 1536 and 1792, and larger-reference availability through 4096. Adjust those sizes together with your baseline grid. At least four distinct structural support sizes are required, and the requested reference must be in that grid.
 
 ```bash
 analysis_options=(
@@ -236,30 +238,30 @@ analysis_options=(
   --min-component-windows 4 --pixel-size-mm "$PIXEL_MM"
 )
 
-python validation/rea_validation_wrapper.py --all-images \
+python validation/structural_uncertainty.py --all-images \
   "${analysis_options[@]}" \
   --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation"
 
-python validation/rstat_sensitivity_wrapper.py --all-images \
+python validation/screening_sensitivity.py --all-images \
   "${analysis_options[@]}" \
   --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation"
 
-python validation/rea_validation_wrapper.py --aggregate \
+python validation/structural_uncertainty.py --aggregate \
   --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation" \
   --expected-images "${#images[@]}" --bootstrap 10000 --seed 20261029
 
-python validation/rstat_sensitivity_wrapper.py --aggregate \
+python validation/screening_sensitivity.py --aggregate \
   --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation" \
   --expected-images "${#images[@]}"
 
-python validation/rebuild_derived.py \
+python validation/build_plot_data.py \
   --checkpoint-dir "$RUN/checkpoints" --output-dir "$RUN/validation" \
   --expected-images "${#images[@]}"
 ```
 
 `--all-images` processes N images sequentially. To process one position, replace it with `--image 3` while retaining the **complete input list** and settings. An alternative is `--data-root /path/to/dataset`, which discovers images under `BSE/`; explicit `--images` avoids study-specific directory assumptions. Use `--masks PATH...` instead of `--mask-dir` for explicitly paired mask files.
 
-Always pass the same `--checkpoint-dir` to processing, aggregation and reconstruction. Omitting it during aggregation selects the bundled seven-image checkpoints. A new dataset or configuration needs a new checkpoint directory. Stored metadata records ordered image and mask paths, file sizes and modification times, and configuration. The wrappers reject incomplete or mixed populations and changed inputs at checkpoint-writing time. These metadata checks are not content checksums. Aggregation reads the stored metadata and can run without access to the original image files.
+Always pass the same `--checkpoint-dir` to processing, aggregation and reconstruction. Omitting it during aggregation selects the bundled seven-image checkpoints. A new dataset or configuration needs a new checkpoint directory. Stored metadata records ordered image and mask paths, file sizes and modification times, and configuration. The programs reject incomplete or mixed populations and changed inputs at checkpoint-writing time. These metadata checks are not content checksums. Aggregation reads the stored metadata and can run without access to the original image files.
 
 Each bootstrap draw samples **N images with replacement from the N supplied images**. Supports remain linked within each image. Leave-one-image-out analysis creates N exclusions when N > 1. With one image, independent-image uncertainty cannot be estimated; output marks the degenerate bootstrap and omits leave-one-image-out estimates.
 
@@ -272,7 +274,7 @@ Each bootstrap draw samples **N images with replacement from the N supplied imag
 | `reference_sensitivity_extra.json` | Shorter-reference and explicitly flagged exploratory larger-reference diagnostics. |
 | `figure2_plot_data.npz` | Curves, selected spectra, calibration and selected support for Figure 2. |
 
-A non-selection remains explicit, including when every bootstrap draw fails or no common support is available. Successful-only percentiles must be reported together with the failure fraction. Extra-reference diagnostics that bypass the 49-position availability check are marked `enforces_original49_common_size_gate: false` and must not be presented as production-protocol results. See [validation/README.md](validation/README.md) for defaults and file formats.
+A non-selection remains explicit, including when every bootstrap draw fails or no common support is available. Successful-only percentiles must be reported together with the failure fraction. Extra-reference diagnostics that bypass the 49-position availability check are marked `enforces_production49_common_size_gate: false` and must not be presented as production-protocol results. See [validation/README.md](validation/README.md) for defaults and file formats.
 
 ## Independent property calculations
 
@@ -309,7 +311,7 @@ PROPERTY_WINDOWS=32,48,64,80,96,112,128,160,192,204,224,256,320,384,448,512
 PROPERTY_REA_PIXELS=204
 ```
 
-The values above illustrate the study's property settings. Set your own screening scales and support sequence. Convert a structural side to the property grid using `L_property_pixels = L_structural_pixels × structural_pixel_mm / property_pixel_mm`; choose and record an integer rounding convention. The original run used a **nominal 204-pixel (2.04 mm)** transfer. That is not the exact nearest-integer conversion of 1536 × 0.00131 / 0.01, which is 201.216 pixels. For a new dataset, use its measured support and calibration rather than copying 204.
+The values above illustrate the study's property settings. Set your own screening scales and support sequence. Convert a structural side to the property grid using `L_property_pixels = L_structural_pixels × structural_pixel_mm / property_pixel_mm`; choose and record an integer rounding convention. The study uses a **nominal 204-pixel (2.04 mm)** transfer. That is not the exact nearest-integer conversion of 1536 × 0.00131 / 0.01, which is 201.216 pixels. For a new dataset, use its measured support and calibration rather than copying 204.
 
 ```bash
 python detect_stationary_domains_general.py \
@@ -340,25 +342,33 @@ The solver uses periodic Q4 elements, 2 × 2 Gauss integration, zero-mean constr
 
 ## Generate figures for your dataset
 
-Use explicit paths so all panels refer to the new calculation:
+The calculation programs write numerical results and diagnostic plots. The three scripts in `figures/` assemble those results into the manuscript layouts. Each script draws the complete multi-panel figure from numerical inputs, so the manuscript figures can be reproduced without manual image editing. The Figure 3 script also exports individual panels and a property-map illustration.
+
+| Assembly script | Manuscript output | Numerical inputs |
+| --- | --- | --- |
+| `figures/figure_1.py` | `Figure_1.png` and `Figure_1.pdf` | Selected image, its mask and detector window CSV. |
+| `figures/figure_2.py` | `Figure_2.png` and `Figure_2.pdf` | Selected image and structural plotting NPZ. |
+| `figures/figure_3.py` | `Figure_3.png` and `Figure_3.pdf` | Property-map triplets, per-window responses and phase assignments. |
+
+Use explicit paths so all panels refer to the intended calculation:
 
 ```bash
 example_image="${images[0]}"
 example_stem="${example_image##*/}"
 example_stem="${example_stem%.*}"
 
-python figures/regenerate_figure1_layout.py \
+python figures/figure_1.py \
   --image-file "$example_image" \
   --mask-file "$RUN/masks/${example_stem}_stationary_mask.tif" \
   --windows-file "$RUN/masks/${example_stem}_stationary_windows.csv" \
   --output-dir "$RUN/figures"
 
-python figures/regenerate_figure2_layout.py \
+python figures/figure_2.py \
   --image-file "$example_image" \
   --data-file "$RUN/validation/figure2_plot_data.npz" \
   --pixel-size-mm "$PIXEL_MM" --output-dir "$RUN/figures"
 
-python figures/regenerate_revised_figures.py \
+python figures/figure_3.py \
   --kappa-maps "${kappa_files[@]}" --E-maps "${elastic_files[@]}" \
   --nu-maps "${poisson_files[@]}" \
   --window-values "$RUN/properties/properties_window_values.csv" \
@@ -367,11 +377,11 @@ python figures/regenerate_revised_figures.py \
   --output-dir "$RUN/property_figures"
 ```
 
-Run the third command only after the property calculations. Omit `--rea-pixels` when no structural support was selected. Supplying only `--window-values` produces response plots without requiring maps. To add phase-composition plots, supply an explicit `--phase-table` with `name,kappa,E,nu` entries; see [figures/README.md](figures/README.md). Generic maps receive no automatic dune-sand mineral names. Use `--study-preset` only with the original material assignments.
+Run the third command only after the property calculations. Omit `--rea-pixels` when no structural support was selected. Supplying only `--window-values` produces response plots without requiring maps. To add phase-composition plots, supply an explicit `--phase-table` with `name,kappa,E,nu` entries; see [figures/README.md](figures/README.md). Generic maps receive no automatic dune-sand mineral names. Use `--study-preset` only with the study's material assignments.
 
 Figures 1 and 2 have four equal panel areas, external bold panel letters and no panel titles. Their image aspect ratios are preserved. Figure 2 discovers the available spectrum keys and marks non-selection without an REA box or selection line. A selected-size square is schematic, not the location of the actual spectral window. Spectra are peak-normalized for display only; selection uses unnormalized spectra. `--pixel-size-mm` converts support and wavenumber axes assuming `dx=1`; image coordinates remain in pixels.
 
-Figure 3 uses all supplied map sets and response-image IDs. Without a phase table it contains three property-response panels; with a phase table it also includes composition. Reduced image populations are identified from the actual response data. Single-window SEM remains undefined. PNG and PDF outputs are generated, retaining the historical `_revised` filenames for compatibility. Use `--dpi` for lower-resolution previews.
+Figure 3 uses all supplied map sets and response-image IDs. Without a phase table it contains three property-response panels; with a phase table it also includes composition. Reduced image populations are identified from the actual response data. Single-window SEM remains undefined. The assembled outputs are `Figure_1.png/.pdf`, `Figure_2.png/.pdf` and `Figure_3.png/.pdf`, with no panel titles and bold panel labels. All three scripts default to `outputs/figures/`; Figure 3 also writes numerical summaries under `derived_data/` within its output directory. Use `--dpi` for lower-resolution previews.
 
 ## Read and interpret the results
 
@@ -408,7 +418,7 @@ The successful-only bootstrap range is **not an unconditional 95% confidence int
 
 The reference support is only 1.33 times the selected side and has not been demonstrated to reach an asymptotic limit. The results therefore characterize a conditional support under the stated finite-reference protocol. Pixel size and resolved microstructure may affect the estimate. Validation on this material and two-dimensional geometry does not establish a universal support for other materials or a bulk three-dimensional REV.
 
-The supplementary reference-sensitivity file also records a **2560-pixel exploratory calculation** that uses 121-position eligibility instead of the production 49-position gate. Its `enforces_original49_common_size_gate` flag is false. Keep that calculation separate from results produced under the production eligibility rule.
+The supplementary reference-sensitivity file also records a **2560-pixel exploratory calculation** that uses 121-position eligibility instead of the production 49-position gate. Its `enforces_production49_common_size_gate` flag is false. Keep that calculation separate from results produced under the production eligibility rule.
 
 ### Property responses
 
@@ -416,7 +426,7 @@ The property-map screening leaves admissible windows in images **1, 5 and 6**. T
 
 The axial quantities `Ex = 1/S11` and `Ey = 1/S22` are derived from the full plane-strain compliance. The shear quantity `Gxy = 1/S33` retains coupling through that matrix inversion and is generally different from `C33`. The pooled-window standard errors describe the available windows; they are not confidence intervals based on independent images. The image-6-only result should be interpreted with its different sampling population.
 
-Recorded cell-solve times total approximately 420.79 seconds. Hardware and thread settings for those historical timings are not recorded, so this value is not a runtime guarantee for another machine.
+Recorded cell-solve times total approximately 420.79 seconds. Hardware and thread settings for these recorded timings are not recorded, so this value is not a runtime guarantee for another machine.
 
 ### File formats
 
@@ -437,9 +447,9 @@ CSV files contain numerical tables. NPZ files contain NumPy arrays and can be op
 
 ## Reproducibility, citation and license
 
-The three core analysis programs correspond to GitHub commit [`8bd49ef71bbd8e320bdb00b3633f8d137cb72bb0`](https://github.com/Christian48596/representativeness-emerges/tree/8bd49ef71bbd8e320bdb00b3633f8d137cb72bb0). The archived inputs underlying the reference statistics are identified by [Zenodo version DOI 10.5281/zenodo.21717613](https://doi.org/10.5281/zenodo.21717613). The [concept DOI](https://doi.org/10.5281/zenodo.21717612) identifies the dataset's version series.
+The inputs underlying the reference statistics are identified by [Zenodo version DOI 10.5281/zenodo.21717613](https://doi.org/10.5281/zenodo.21717613). The [concept DOI](https://doi.org/10.5281/zenodo.21717612) identifies the dataset's version series.
 
-When using the repository, cite the accompanying study, the **specific Zenodo version used**, and the **Git commit or release used**. Record the command-line settings and any dataset-specific changes. The bundled numerical check compares scientific values with tolerances and excludes elapsed times and source-hash metadata from numerical equality tests; it verifies core source files separately. Historical source-hash details and checkpoint provenance are documented in [validation/README.md](validation/README.md).
+When using the repository, cite the accompanying study, the **specific Zenodo version used**, and the **Git commit or release used**. Record the command-line settings and any dataset-specific changes. The bundled numerical check compares scientific values with tolerances and excludes elapsed times and source-hash metadata from numerical equality tests; it verifies core source files separately. Checkpoint formats and source verification are documented in [validation/README.md](validation/README.md).
 
 The software is distributed under the GNU General Public License v3; see [LICENSE](LICENSE). Data licensing is specified in the selected Zenodo record.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Recompute the compact revision results and compare all scientific values.
-No raw images or FEM solves are needed. About 15 seconds on the audit machine.
+"""Recompute the compact study results and compare all scientific values.
+The check uses bundled checkpoints; raw images and FEM solves are not needed.
 """
 from pathlib import Path
 import argparse,json,subprocess,sys,tempfile,hashlib
@@ -8,11 +8,11 @@ import numpy as np
 
 REPO=Path(__file__).resolve().parents[1]
 EXPECTED_GIT_BLOBS={
- 'detect_stationary_domains_general.py':'9682ff8bec2d55e2f2481fb361326ed47ee8c943',
- 'rea_stationary_mask_cli_v24_general.py':'862983356fc38aa8df56a1a3dea1fc962c150537',
+ 'detect_stationary_domains_general.py':'d181996172786eb988e16898eddac916dbaf0a44',
+ 'rea_stationary_mask.py':'487565b5d8e98f7ba21298645323da8657d1c512',
  'property_full_homogenized_inside_property_masks.py':'ca4ae44afa2e691255608a4d62e38dbd3ef92997'}
-# Historical source_sha256 hashes include the acquisition copy's extra trailing
-# newline. Git originals are restored exactly; scientific values are unaffected.
+# Runtime and source-file provenance are not scientific observables.
+# Source integrity is verified independently against the package fingerprints.
 SKIP={'elapsed_seconds','elapsed_image_seconds','source_sha256'}
 
 def compare(a,b,path='root'):
@@ -34,7 +34,7 @@ def main():
   assert actual==expected,(name,actual)
  with tempfile.TemporaryDirectory(prefix='rea-verification-') as td:
   out=Path(td)
-  for script,args in [('rea_validation_wrapper.py',['--aggregate','--bootstrap','10000','--verify-reference']),('rstat_sensitivity_wrapper.py',['--aggregate']),('rebuild_derived.py',[])]:
+  for script,args in [('structural_uncertainty.py',['--aggregate','--bootstrap','10000','--verify-reference']),('screening_sensitivity.py',['--aggregate']),('build_plot_data.py',[])]:
    result=subprocess.run([sys.executable,str(REPO/'validation'/script),*args,'--output-dir',str(out)],capture_output=True,text=True)
    if result.returncode:
     print(result.stdout);print(result.stderr,file=sys.stderr);raise SystemExit(result.returncode)
@@ -47,6 +47,6 @@ def main():
   for i in range(1,8):
    name=f'baseline_per_image_{i}.csv'
    np.testing.assert_allclose(np.loadtxt(out/name,delimiter=',',skiprows=1),np.loadtxt(REPO/'validation/results'/name,delimiter=',',skiprows=1),rtol=1e-12,atol=1e-12,equal_nan=True)
- print('PASS: three original Git blobs; baseline; all 10,000 bootstrap draws; leave-one-out; grid, filtering, reference and R_stat sensitivities; seven per-image CSVs; Figure 2 arrays.')
+ print('PASS: three computational source fingerprints; baseline; all 10,000 bootstrap draws; leave-one-out; grid, filtering, reference and R_stat sensitivities; seven per-image CSVs; Figure 2 arrays.')
  print('Baseline: 1536 pixels. Bootstrap non-selections: 3310/10000. Conditional interval: 896–1536 pixels.')
 if __name__=='__main__':main()

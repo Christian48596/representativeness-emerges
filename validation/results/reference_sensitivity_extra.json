@@ -142,7 +142,7 @@
         "is_reference": true
       }
     ],
-    "enforces_original49_common_size_gate": true
+    "enforces_production49_common_size_gate": true
   },
   {
     "mode": "masked121",
@@ -302,7 +302,7 @@
         "is_reference": true
       }
     ],
-    "enforces_original49_common_size_gate": true
+    "enforces_production49_common_size_gate": true
   },
   {
     "mode": "masked121",
@@ -492,7 +492,7 @@
         "is_reference": true
       }
     ],
-    "enforces_original49_common_size_gate": false
+    "enforces_production49_common_size_gate": false
   },
   {
     "reference": 3072,

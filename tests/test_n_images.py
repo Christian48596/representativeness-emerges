@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small integration tests for arbitrary image counts and unchanged core methods.
+"""Integration tests for N-image analysis and computational source integrity.
 
 Run from the repository root: python tests/test_n_images.py
 The fixtures are distinct synthetic 2D fields, not independent scientific
@@ -84,10 +84,10 @@ class NImageIntegration(unittest.TestCase):
                 "--min-component-windows", "1",
                 "--output-dir", output, "--checkpoint-dir", output / "checkpoints"]
 
-    def test_core_sources_unchanged(self):
+    def test_core_source_integrity(self):
         expected = {
-            "detect_stationary_domains_general.py": "9682ff8bec2d55e2f2481fb361326ed47ee8c943",
-            "rea_stationary_mask_cli_v24_general.py": "862983356fc38aa8df56a1a3dea1fc962c150537",
+            "detect_stationary_domains_general.py": "d181996172786eb988e16898eddac916dbaf0a44",
+            "rea_stationary_mask.py": "487565b5d8e98f7ba21298645323da8657d1c512",
             "property_full_homogenized_inside_property_masks.py": "ca4ae44afa2e691255608a4d62e38dbd3ef92997",
         }
         for name, digest in expected.items():
@@ -112,7 +112,7 @@ class NImageIntegration(unittest.TestCase):
                     self.assertTrue(np.asarray(Image.open(m)).all())
                 structural = out / "structural"
                 self.run_program(
-                    "rea_stationary_mask_cli_v24_general.py", *self.images[:n],
+                    "rea_stationary_mask.py", *self.images[:n],
                     "--max-side", "0", "--window-sizes", "8,16,24,32",
                     "--reference-L", "32", "--selected-spectra", "8,32",
                     "--n-common-k-grid", "32", "--n-window-samples", "9",
@@ -155,8 +155,8 @@ class NImageIntegration(unittest.TestCase):
             with self.subTest(n=n):
                 out = self.work / f"validation_{n}"
                 args = self.validation_args(n, out)
-                self.run_program("validation/rea_validation_wrapper.py", "--all-images", *args)
-                self.run_program("validation/rea_validation_wrapper.py", "--aggregate", "--bootstrap", "30",
+                self.run_program("validation/structural_uncertainty.py", "--all-images", *args)
+                self.run_program("validation/structural_uncertainty.py", "--aggregate", "--bootstrap", "30",
                                  "--checkpoint-dir", out / "checkpoints", "--output-dir", out)
                 result = json.loads((out / "validation_results.json").read_text())
                 self.assertEqual(len(result["mask_fractions"]), n)
@@ -167,13 +167,13 @@ class NImageIntegration(unittest.TestCase):
                     self.assertEqual(draws["draws"].shape, (30, n))
                     self.assertEqual(set(draws["draws"].ravel()), set(range(n)))
                     self.assertEqual(draws["selected_pixels"].shape, (30,))
-                self.run_program("validation/rebuild_derived.py", "--checkpoint-dir", out / "checkpoints", "--output-dir", out)
+                self.run_program("validation/build_plot_data.py", "--checkpoint-dir", out / "checkpoints", "--output-dir", out)
                 with np.load(out / "figure2_plot_data.npz", allow_pickle=False) as plot:
                     np.testing.assert_array_equal(plot["L"], [8,16,24,32])
                     self.assertEqual(int(plot["reference_L"]), 32)
                     self.assertNotEqual(plot["accepted_L"].dtype, np.dtype("O"))
-                self.run_program("validation/rstat_sensitivity_wrapper.py", "--all-images", *args)
-                self.run_program("validation/rstat_sensitivity_wrapper.py", "--aggregate",
+                self.run_program("validation/screening_sensitivity.py", "--all-images", *args)
+                self.run_program("validation/screening_sensitivity.py", "--aggregate",
                                  "--checkpoint-dir", out / "checkpoints", "--output-dir", out)
                 sensitivity = json.loads((out / "rstat_sensitivity_results.json").read_text())
                 self.assertEqual(len(sensitivity["elapsed_image_seconds"]), n)
@@ -181,11 +181,11 @@ class NImageIntegration(unittest.TestCase):
                 for experiment in sensitivity["experiments"]:
                     self.assertEqual(len(experiment["mask_fractions"]), n)
                 # Reusing a set for different images must not mix old statistics.
-                self.run_program("validation/rea_validation_wrapper.py", "--all-images",
+                self.run_program("validation/structural_uncertainty.py", "--all-images",
                                  *self.validation_args(n-1, out), succeeds=False)
                 changed = self.validation_args(n, out)
                 changed[changed.index("--reference-L")+1] = "24"
-                self.run_program("validation/rea_validation_wrapper.py", "--all-images", *changed, succeeds=False)
+                self.run_program("validation/structural_uncertainty.py", "--all-images", *changed, succeeds=False)
                 # A missing member of an explicitly registered N-image dataset
                 # must not silently turn its ensemble into N-1 images.
                 checkpoints = sorted((out/"checkpoints").glob("image_*.json.gz"))
@@ -196,31 +196,31 @@ class NImageIntegration(unittest.TestCase):
                     first = out/"checkpoints/image_1.json.gz"
                     original = first.read_bytes()
                     first.write_bytes((self.work/"validation_9/checkpoints/image_1.json.gz").read_bytes())
-                    self.run_program("validation/rea_validation_wrapper.py", "--aggregate", "--bootstrap", "10",
+                    self.run_program("validation/structural_uncertainty.py", "--aggregate", "--bootstrap", "10",
                                      "--checkpoint-dir", out/"checkpoints", "--output-dir", out, succeeds=False)
                     first.write_bytes(original)
                 checkpoints[-1].unlink()
-                self.run_program("validation/rea_validation_wrapper.py", "--aggregate", "--bootstrap", "10",
+                self.run_program("validation/structural_uncertainty.py", "--aggregate", "--bootstrap", "10",
                                  "--checkpoint-dir", out/"checkpoints", "--output-dir", out, succeeds=False)
 
     def test_no_selection_and_single_image(self):
         out = self.work / "none_selected"
-        self.run_program("validation/rea_validation_wrapper.py", "--all-images",
+        self.run_program("validation/structural_uncertainty.py", "--all-images",
                          *self.validation_args(9, out, [self.empty_mask]*9))
-        self.run_program("validation/rea_validation_wrapper.py", "--aggregate", "--bootstrap", "20",
+        self.run_program("validation/structural_uncertainty.py", "--aggregate", "--bootstrap", "20",
                          "--checkpoint-dir", out / "checkpoints", "--output-dir", out)
         result = json.loads((out / "validation_results.json").read_text())
         self.assertIsNone(result["baseline"]["selected"])
-        self.run_program("validation/rebuild_derived.py", "--checkpoint-dir", out / "checkpoints", "--output-dir", out)
+        self.run_program("validation/build_plot_data.py", "--checkpoint-dir", out / "checkpoints", "--output-dir", out)
         with np.load(out / "figure2_plot_data.npz", allow_pickle=False) as plot:
             self.assertTrue(np.isnan(plot["accepted_L"]))
-        self.run_program("figures/regenerate_figure2_layout.py", "--image-file", self.images[0],
+        self.run_program("figures/figure_2.py", "--image-file", self.images[0],
                          "--data-file", out/"figure2_plot_data.npz", "--output-dir", out/"figure", "--dpi", "35")
         audit = json.loads((out/"figure/Figure_2_layout_audit.json").read_text())
         self.assertIsNone(audit["accepted_L"])
         one = self.work / "single"
-        self.run_program("validation/rea_validation_wrapper.py", "--all-images", *self.validation_args(1, one))
-        self.run_program("validation/rea_validation_wrapper.py", "--aggregate", "--bootstrap", "10",
+        self.run_program("validation/structural_uncertainty.py", "--all-images", *self.validation_args(1, one))
+        self.run_program("validation/structural_uncertainty.py", "--aggregate", "--bootstrap", "10",
                          "--checkpoint-dir", one / "checkpoints", "--output-dir", one)
         result = json.loads((one / "validation_results.json").read_text())
         self.assertEqual(result["leave_one_image_out"], [])
@@ -240,12 +240,12 @@ class NImageIntegration(unittest.TestCase):
                 args = self.validation_args(1, out)
                 args[args.index("--images")+1] = image
                 args[args.index("--masks")+1] = mask
-                self.run_program("validation/rea_validation_wrapper.py", "--all-images", *args)
+                self.run_program("validation/structural_uncertainty.py", "--all-images", *args)
                 changed = image if changed_input == "image" else mask
                 array = np.array(Image.open(changed))
                 array[0, 0] = 0
                 Image.fromarray(array).save(changed)
-                self.run_program("validation/rea_validation_wrapper.py", "--all-images", *args, succeeds=False)
+                self.run_program("validation/structural_uncertainty.py", "--all-images", *args, succeeds=False)
 
     def test_constant_image_checkpoint_roundtrip(self):
         image = self.inputs/"constant.tif"
@@ -255,16 +255,16 @@ class NImageIntegration(unittest.TestCase):
                 out = self.work / f"constant_{empty}"
                 args = self.validation_args(1, out, [self.empty_mask] if empty else self.masks[:1])
                 args[args.index("--images")+1] = image
-                self.run_program("validation/rea_validation_wrapper.py", "--all-images", *args)
+                self.run_program("validation/structural_uncertainty.py", "--all-images", *args)
                 # Constant fields create undefined boundary/variance ratios.
                 # Those NaNs must survive the safe checkpoint format and be
                 # consumable by aggregation and the plotting-data rebuild.
-                self.run_program("validation/rea_validation_wrapper.py", "--aggregate", "--bootstrap", "10",
+                self.run_program("validation/structural_uncertainty.py", "--aggregate", "--bootstrap", "10",
                                  "--checkpoint-dir", out/"checkpoints", "--output-dir", out)
                 result = json.loads((out/"validation_results.json").read_text(),
                                     parse_constant=lambda value: self.fail("Non-standard JSON constant: " + value))
                 self.assertFalse(result["bootstrap"]["independent_image_uncertainty_estimable"])
-                self.run_program("validation/rebuild_derived.py", "--checkpoint-dir", out/"checkpoints", "--output-dir", out)
+                self.run_program("validation/build_plot_data.py", "--checkpoint-dir", out/"checkpoints", "--output-dir", out)
                 with np.load(out/"figure2_plot_data.npz", allow_pickle=False) as plot:
                     np.testing.assert_array_equal(plot["L"], [8, 16, 24, 32])
                     self.assertNotEqual(plot["accepted_L"].dtype, np.dtype("O"))
@@ -279,7 +279,7 @@ class NImageIntegration(unittest.TestCase):
         self.run_program("detect_stationary_domains_general.py", image,
                          "--stationarity-window", "16", "--stride", "8", "--tau-mu", "2", "--tau-sigma", "2",
                          "--min-component-windows", "1", "--no-morphology", "--output-dir", detector, "--dpi", "35")
-        self.run_program("figures/regenerate_figure1_layout.py", "--image-file", image,
+        self.run_program("figures/figure_1.py", "--image-file", image,
                          "--mask-file", detector/"portrait_stationary_mask.tif",
                          "--windows-file", detector/"portrait_stationary_windows.csv",
                          "--output-dir", out/"fig1", "--dpi", "35")
@@ -295,7 +295,7 @@ class NImageIntegration(unittest.TestCase):
                     k_6=k,p_6=np.exp(-k),sem_6=np.zeros_like(k),
                     k_18=k,p_18=np.exp(-2*k),sem_18=np.zeros_like(k))
         np.savez_compressed(out/"custom.npz", **data)
-        self.run_program("figures/regenerate_figure2_layout.py", "--image-file", image,
+        self.run_program("figures/figure_2.py", "--image-file", image,
                          "--data-file", out/"custom.npz", "--output-dir", out/"fig2", "--pixel-size-mm", ".05", "--dpi", "35")
         audit = json.loads((out/"fig2/Figure_2_layout_audit.json").read_text())
         self.assertTrue(audit["identical_panel_boxes"])
@@ -309,7 +309,7 @@ class NImageIntegration(unittest.TestCase):
         self.run_program("property_full_homogenized_inside_property_masks.py",
                          "--kappa-maps", *self.kappa[:2], "--E-maps", *self.young[:1],
                          "--nu-maps", *self.poisson[:2], "--window-sizes", "4", "--L-rea", "4", succeeds=False)
-        self.run_program("validation/rea_validation_wrapper.py", "--aggregate", "--checkpoint-dir",
+        self.run_program("validation/structural_uncertainty.py", "--aggregate", "--checkpoint-dir",
                          self.work / "missing_checkpoints", succeeds=False)
 
 

@@ -136,9 +136,9 @@ def discover(directory,prefix,args):
     else:
         manifest=None
         if getattr(args,'images',None) or getattr(args,'masks',None) or getattr(args,'mask_dir',None):
-            raise ValueError('Legacy checkpoints do not identify a custom input list. Recompute images into a new checkpoint directory.')
+            raise ValueError('Bundled study checkpoints do not identify a custom input list. Recompute images into a new checkpoint directory.')
         config=resolved_config(args)
-        if config!=DEFAULTS:raise ValueError('Legacy checkpoints have fixed study parameters. Recompute images before changing configuration.')
+        if config!=DEFAULTS:raise ValueError('Bundled study checkpoints have fixed study parameters. Recompute images before changing configuration.')
     expected=getattr(args,'expected_images',None)
     if expected is not None and expected!=len(records):raise ValueError(f'Expected {expected} images; found {len(records)} checkpoints.')
     return records,config,manifest

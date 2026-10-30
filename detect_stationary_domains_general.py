@@ -5,9 +5,8 @@ General stationary-domain detector for microscopy images and numerical property 
 
 Purpose
 -------
-This script creates strict stationary-domain masks before any REV calculation.
-It generalizes the previous BSE/gray-image mask detector so that the same idea
-can be applied to numerical property fields such as
+This script creates statistical-admissibility masks for representative-support
+analysis of microscopy images and numerical property fields such as
 
     kappa(x,y) [W m^-1 K^-1], E(x,y) [GPa], nu(x,y) [-]
 

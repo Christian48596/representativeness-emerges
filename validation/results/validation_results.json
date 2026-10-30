@@ -1,6 +1,6 @@
 {
   "source_sha256": "21a197abece49e15477bec35671c4bab282c7a73224567b832330c9882e25bc9",
-  "baseline_archive_max_absolute_differences": {
+  "baseline_reference_max_absolute_differences": {
     "ensemble_sample_mean_Z": 4.796163466380676e-12,
     "eta_Z": 3.6012859361278515e-15,
     "eta_C": 4.984901380566953e-14

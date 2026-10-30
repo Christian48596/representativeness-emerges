@@ -1,4 +1,4 @@
-"""Safe gzip/JSON checkpoint I/O for revision wrappers (added 2026-10-29).
+"""Safe gzip/JSON checkpoint I/O for image-based structural analyses.
 
 Arrays carry dtype/shape explicitly; no pickle or object execution is used.
 Integer-valued mapping keys are restored for support-size lookup.
